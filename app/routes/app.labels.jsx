@@ -7,22 +7,17 @@ import {
   Button,
   DataTable,
   Modal,
-  Form,
   FormLayout,
   TextField,
-  Select,
   Text,
   ButtonGroup,
-  Banner,
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { authenticate } from "../shopify.server";
-import { prisma } from "../db.server";
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
-
-  console.log("Session:", session); // Debugging
 
   if (!session?.shop) {
     throw new Response("Shop session not found", { status: 400 });
@@ -32,8 +27,6 @@ export const loader = async ({ request }) => {
     where: { shop: session.shop },
     orderBy: { createdAt: "desc" },
   });
-
-  console.log("Fetched labels:", labels); // Debugging
 
   return json({ labels });
 };

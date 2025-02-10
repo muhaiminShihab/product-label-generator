@@ -1,47 +1,65 @@
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
-import * as Polaris from '@shopify/polaris';
+import * as Polaris from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { authenticate } from "../shopify.server";
-import { prisma } from "../db.server";
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  try {
+    // Authenticate the admin and retrieve session data
+    const { admin, session } = await authenticate.admin(request);
 
-  const response = await admin.graphql(
-    `#graphql
+    console.log("Admin Object:", admin);
+    console.log("Session Object:", session);
+
+    if (!admin || !session?.shop) {
+      throw new Error("Unauthorized or invalid session");
+    }
+
+    // Fetch products from Shopify Admin GraphQL API
+    const response = await admin.graphql(`
       query {
-        products(first: 50) {
-          edges {
-            node {
+        products(first: 10) {
+          nodes {
               id
               title
-              handle
-            }
           }
         }
       }
-    `
-  );
+    `);
 
-  const { data } = await response.json();
-  const products = data.products.edges.map(({ node }) => node);
+    const responseJson = await response.json();
 
-  const labels = await prisma.label.findMany({
-    where: { shop: session.shop },
-  });
+    // Ensure response contains valid data
+    if (!responseJson?.data?.products?.nodes) {
+      throw new Error("Failed to fetch products");
+    }
 
-  const productLabels = await prisma.productLabel.findMany({
-    where: { shop: session.shop },
-    include: {
-      label: true  // Include all label fields
-    },
-  });
+    // const products = responseJson.data.products.nodes;
+    const products = [];
 
-  // Filter out any product labels where the label might be null
-  const validProductLabels = productLabels.filter(pl => pl.label !== null);
+    // Fetch labels from Prisma
+    const labels = await prisma.label.findMany({
+      where: { shop: session.shop },
+    });
 
-  return json({ products, labels, productLabels: validProductLabels });
+    // Fetch product labels, including related label data
+    const productLabels = await prisma.productLabel.findMany({
+      where: { shop: session.shop },
+      include: {
+        label: true, // Ensure label fields are included
+      },
+    });
+
+    // Filter out any product labels where the label might be null
+    const validProductLabels = productLabels.filter((pl) => pl.label !== null);
+
+    return json({ products, labels, productLabels: validProductLabels });
+  } catch (error) {
+    console.error("Loader error:", error);
+    return json({ error: error.message }, { status: 500 });
+  }
 };
 
 export const action = async ({ request }) => {
@@ -110,117 +128,27 @@ export default function ProductsPage() {
       <Layout>
         <Layout.Section>
           <Card>
-            <ResourceList
+            <Polaris.ResourceList
               resourceName={{ singular: "product", plural: "products" }}
               items={products}
-              renderItem={(product) => {
-                const productLabels = getProductLabels(product.id);
-
-                return (
-                  <ResourceItem
-                    id={product.id}
-                    accessibilityLabel={`View details for ${product.title}`}
-                    name={product.title}
-                  >
-                    <Stack vertical>
-                      <Stack.Item>
-                        <Text variant="bodyMd" fontWeight="bold">
-                          {product.title}
-                        </Text>
-                      </Stack.Item>
-                      <Stack.Item>
-                        <Stack spacing="tight">
-                          {productLabels.map((label) => (
-                            <Tag key={label.id}>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "12px",
-                                    height: "12px",
-                                    borderRadius: "2px",
-                                    backgroundColor: label.color,
-                                  }}
-                                />
-                                {label.name}
-                              </div>
-                            </Tag>
-                          ))}
-                        </Stack>
-                      </Stack.Item>
-                      <Stack.Item>
-                        <Button
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setIsModalOpen(true);
-                          }}
-                        >
-                          Manage Labels
-                        </Button>
-                      </Stack.Item>
-                    </Stack>
-                  </ResourceItem>
-                );
-              }}
+              renderItem={(product) => (
+                <Polaris.ResourceItem
+                  id={product.id}
+                  accessibilityLabel={`View details for ${product.title}`}
+                  name={product.title}
+                >
+                  <Polaris.Stack vertical>
+                    <Polaris.Stack.Item>
+                      <Polaris.Text variant="bodyMd" fontWeight="bold">
+                        {product.title}
+                      </Polaris.Text>
+                    </Polaris.Stack.Item>
+                  </Polaris.Stack>
+                </Polaris.ResourceItem>
+              )}
             />
           </Card>
         </Layout.Section>
-
-        {selectedProduct && (
-          <Modal
-            open={isModalOpen}
-            onClose={handleModalClose}
-            title={`Manage Labels - ${selectedProduct.title}`}
-            primaryAction={{
-              content: "Save",
-              onAction: (selectedLabels) => handleLabelUpdate(selectedLabels),
-            }}
-            secondaryActions={[{
-              content: "Cancel",
-              onAction: handleModalClose,
-            }]}
-          >
-            <Modal.Section>
-              <FormLayout>
-                <ChoiceList
-                  allowMultiple
-                  title="Labels"
-                  choices={labels.map((label) => ({
-                    label: (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "16px",
-                            height: "16px",
-                            borderRadius: "4px",
-                            backgroundColor: label.color,
-                          }}
-                        />
-                        <span>{label.name}</span>
-                      </div>
-                    ),
-                    value: label.id,
-                  }))}
-                  selected={getProductLabels(selectedProduct.id).map(
-                    (label) => label.id
-                  )}
-                  onChange={handleLabelUpdate}
-                />
-              </FormLayout>
-            </Modal.Section>
-          </Modal>
-        )}
       </Layout>
     </Page>
   );
