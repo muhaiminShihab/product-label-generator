@@ -1,0 +1,19 @@
+.app-block-container {
+  margin: 1rem 0;
+}
+
+.product-labels-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.product-label {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: var(--label-bg-color, #000);
+  color: var(--label-text-color, #fff);
+}

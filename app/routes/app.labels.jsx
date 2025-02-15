@@ -26,6 +26,11 @@ export const loader = async ({ request }) => {
   const labels = await prisma.label.findMany({
     where: { shop: session.shop },
     orderBy: { createdAt: "desc" },
+    include: {
+      _count: {
+        select: { products: true }
+      }
+    }
   });
 
   return json({ labels });
@@ -49,6 +54,16 @@ export const action = async ({ request }) => {
         shop: session.shop,
       },
     });
+  } else if (action === "edit") {
+    const id = formData.get("id");
+    const name = formData.get("name");
+    const color = formData.get("color");
+    const description = formData.get("description");
+
+    await prisma.label.update({
+      where: { id },
+      data: { name, color, description },
+    });
   } else if (action === "delete") {
     const id = formData.get("id");
     await prisma.label.delete({
@@ -66,30 +81,37 @@ export default function LabelsPage() {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#000000");
   const [description, setDescription] = useState("");
-
-  const handleModalClose = useCallback(() => {
-    setIsModalOpen(false);
-    setName("");
-    setColor("#000000");
-    setDescription("");
-  }, []);
-
-  const handleSubmit = useCallback(() => {
-    const data = new FormData();
-    data.append("action", "create");
-    data.append("name", name);
-    data.append("color", color);
-    data.append("description", description);
-    submit(data, { method: "post" });
-    handleModalClose();
-  }, [name, color, description, submit]);
+  const [editingLabel, setEditingLabel] = useState(null);
+  const [labelToDelete, setLabelToDelete] = useState(null);
 
   const handleDelete = useCallback((id) => {
     const data = new FormData();
     data.append("action", "delete");
     data.append("id", id);
     submit(data, { method: "post" });
+    setLabelToDelete(null);
   }, [submit]);
+
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    setName("");
+    setColor("#000000");
+    setDescription("");
+    setEditingLabel(null);
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    const data = new FormData();
+    data.append("action", editingLabel ? "edit" : "create");
+    data.append("name", name);
+    data.append("color", color);
+    data.append("description", description);
+    if (editingLabel) {
+      data.append("id", editingLabel.id);
+    }
+    submit(data, { method: "post" });
+    handleModalClose();
+  }, [name, color, description, editingLabel, submit, handleModalClose]);
 
   const rows = labels.map((label) => [
     label.name,
@@ -102,31 +124,37 @@ export default function LabelsPage() {
       }}
     />,
     label.description || "-",
+    label._count.products,
     <ButtonGroup>
-      <Button
-        destructive
-        onClick={() => handleDelete(label.id)}
-      >
+      <Button onClick={() => handleEdit(label)}>Edit</Button>
+      <Button destructive onClick={() => setLabelToDelete(label)}>
         Delete
       </Button>
     </ButtonGroup>,
   ]);
 
+  const handleEdit = useCallback((label) => {
+    setName(label.name);
+    setColor(label.color);
+    setDescription(label.description || "");
+    setEditingLabel(label);
+    setIsModalOpen(true);
+  }, []);
+
   return (
     <Page
-      title="Product Labels"
-      primaryAction={
-        <Button primary onClick={() => setIsModalOpen(true)}>
-          Create Label
-        </Button>
-      }
+      title="Labels"
+      primaryAction={{
+        content: "Add Label",
+        onAction: () => setIsModalOpen(true),
+      }}
     >
       <Layout>
         <Layout.Section>
           <Card>
             <DataTable
-              columnContentTypes={["text", "text", "text", "text"]}
-              headings={["Name", "Color", "Description", "Actions"]}
+              columnContentTypes={["text", "text", "text", "numeric", "text"]}
+              headings={["Name", "Color", "Description", "Products", "Actions"]}
               rows={rows}
               footerContent={
                 rows.length === 0 ? (
@@ -139,13 +167,15 @@ export default function LabelsPage() {
           </Card>
         </Layout.Section>
 
+        {/* Edit/Create Modal */}
         <Modal
           open={isModalOpen}
           onClose={handleModalClose}
-          title="Create New Label"
+          title={editingLabel ? "Edit Label" : "Create New Label"}
           primaryAction={{
-            content: "Create",
+            content: editingLabel ? "Save" : "Create",
             onAction: handleSubmit,
+            disabled: !name || !color,
           }}
           secondaryActions={[{
             content: "Cancel",
@@ -160,14 +190,33 @@ export default function LabelsPage() {
                 onChange={setName}
                 autoComplete="off"
                 required
+                error={name.length === 0 ? "Name is required" : undefined}
               />
-              <TextField
-                label="Color"
-                value={color}
-                onChange={setColor}
-                type="color"
-                required
-              />
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Color Code"
+                    value={color}
+                    onChange={(value) => {
+                      if (value.match(/^#([0-9A-F]{3}){1,2}$/i)) {
+                        setColor(value);
+                      } else if (value.startsWith('#') || value === '') {
+                        setColor(value);
+                      }
+                    }}
+                    autoComplete="off"
+                    required
+                    error={color.length === 0 ? "Color is required" : undefined}
+                  />
+                </div>
+                <TextField
+                  label="Color Picker"
+                  type="color"
+                  value={color.match(/^#([0-9A-F]{3}){1,2}$/i) ? color : '#000000'}
+                  onChange={setColor}
+                  required
+                />
+              </div>
               <TextField
                 label="Description"
                 value={description}
@@ -175,6 +224,28 @@ export default function LabelsPage() {
                 multiline={3}
               />
             </FormLayout>
+          </Modal.Section>
+        </Modal>
+
+        {/* Add Delete Confirmation Modal */}
+        <Modal
+          open={labelToDelete !== null}
+          onClose={() => setLabelToDelete(null)}
+          title="Delete Label"
+          primaryAction={{
+            content: "Delete",
+            onAction: () => handleDelete(labelToDelete?.id),
+            destructive: true,
+          }}
+          secondaryActions={[{
+            content: "Cancel",
+            onAction: () => setLabelToDelete(null),
+          }]}
+        >
+          <Modal.Section>
+            <Text>
+              Are you sure you want to delete the label "{labelToDelete?.name}"? This action cannot be undone.
+            </Text>
           </Modal.Section>
         </Modal>
       </Layout>

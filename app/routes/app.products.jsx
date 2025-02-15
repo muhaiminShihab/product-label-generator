@@ -1,3 +1,4 @@
+// Remove the individual imports and keep the namespace import
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
 import * as Polaris from "@shopify/polaris";
@@ -7,52 +8,47 @@ import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   try {
-    // Authenticate the admin and retrieve session data
     const { admin, session } = await authenticate.admin(request);
-
-    console.log("Admin Object:", admin);
-    console.log("Session Object:", session);
 
     if (!admin || !session?.shop) {
       throw new Error("Unauthorized or invalid session");
     }
 
-    // Fetch products from Shopify Admin GraphQL API
+    const url = new URL(request.url);
+    const searchTerm = url.searchParams.get("searchTerm") || "";
+
     const response = await admin.graphql(`
       query {
-        products(first: 10) {
+        products(first: 10, query: "${searchTerm}") {
           nodes {
-              id
-              title
+            id
+            title
+            images(first: 1) {
+              nodes {
+                url
+              }
+            }
+            status
+            updatedAt
           }
         }
       }
     `);
 
     const responseJson = await response.json();
+    const products = responseJson.data?.products?.nodes || [];
 
-    // Ensure response contains valid data
-    if (!responseJson?.data?.products?.nodes) {
-      throw new Error("Failed to fetch products");
-    }
-
-    // const products = responseJson.data.products.nodes;
-    const products = [];
-
-    // Fetch labels from Prisma
     const labels = await prisma.label.findMany({
       where: { shop: session.shop },
     });
 
-    // Fetch product labels, including related label data
     const productLabels = await prisma.productLabel.findMany({
       where: { shop: session.shop },
       include: {
-        label: true, // Ensure label fields are included
+        label: true,
       },
     });
 
-    // Filter out any product labels where the label might be null
     const validProductLabels = productLabels.filter((pl) => pl.label !== null);
 
     return json({ products, labels, productLabels: validProductLabels });
@@ -92,26 +88,34 @@ export const action = async ({ request }) => {
 };
 
 export default function ProductsPage() {
-  const { products, labels, productLabels } = useLoaderData();
+  const { products = [], labels = [], productLabels = [] } = useLoaderData();
   const submit = useSubmit();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Remove this line as we're now importing Page directly
+  // const { Page } = Polaris;
+
+  const [selectedLabels, setSelectedLabels] = useState([]);
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
     setSelectedProduct(null);
+    setSelectedLabels([]); // Reset selected labels when closing
   }, []);
 
+  // Update this handler to use the selectedLabels state
   const handleLabelUpdate = useCallback(
-    (selectedLabels) => {
+    (selectedLabelIds) => {
       const data = new FormData();
       data.append("action", "update_labels");
       data.append("productId", selectedProduct.id);
-      selectedLabels.forEach((label) => data.append("labels", label));
+      selectedLabelIds.forEach((labelId) => data.append("labels", labelId));
       submit(data, { method: "post" });
       handleModalClose();
     },
-    [selectedProduct, submit]
+    [selectedProduct, submit, handleModalClose]
   );
 
   const getProductLabels = useCallback(
@@ -123,33 +127,128 @@ export default function ProductsPage() {
     [productLabels]
   );
 
+  const handleSearchChange = useCallback((value) => {
+    setSearchTerm(value);
+    submit({ searchTerm: value }, { method: "get" });
+  }, [submit]);
+
+  const rows = (products || []).map((product) => [
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {product.images?.nodes[0]?.url && (
+        <Polaris.Thumbnail
+          source={product.images.nodes[0].url}
+          alt={product.title}
+          size="small"
+        />
+      )}
+      <Polaris.Text variant="bodyMd" fontWeight="bold">
+        {product.title}
+      </Polaris.Text>
+    </div>,
+    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+      {getProductLabels(product.id).map((label) => (
+        <span
+          key={label.id}
+          style={{
+            backgroundColor: label.color,
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#fff',
+          }}
+        >
+          {label.name}
+        </span>
+      ))}
+    </div>,
+    <Polaris.ButtonGroup>
+      // In your rows mapping where you set up the Manage labels button
+      <Polaris.Button
+        onClick={() => {
+          setSelectedProduct(product);
+          setSelectedLabels(getProductLabels(product.id).map(label => label.id));
+          setIsModalOpen(true);
+        }}
+      >
+        Manage labels
+      </Polaris.Button>
+    </Polaris.ButtonGroup>,
+  ]);
+
   return (
-    <Page title="Products">
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <Polaris.ResourceList
-              resourceName={{ singular: "product", plural: "products" }}
-              items={products}
-              renderItem={(product) => (
-                <Polaris.ResourceItem
-                  id={product.id}
-                  accessibilityLabel={`View details for ${product.title}`}
-                  name={product.title}
-                >
-                  <Polaris.Stack vertical>
-                    <Polaris.Stack.Item>
-                      <Polaris.Text variant="bodyMd" fontWeight="bold">
-                        {product.title}
-                      </Polaris.Text>
-                    </Polaris.Stack.Item>
-                  </Polaris.Stack>
-                </Polaris.ResourceItem>
-              )}
+    <Polaris.Page title="Products">
+      <Polaris.Layout>
+        <Polaris.Layout.Section>
+          <Polaris.Card>
+            <div style={{ padding: "16px" }}>
+              <Polaris.TextField
+                label="Search products"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                autoComplete="off"
+                placeholder="Search by product title..."
+                prefix={<Polaris.Icon source={Polaris.SearchMinor} />}
+                clearButton
+                onClearButtonClick={() => handleSearchChange("")}
+              />
+            </div>
+            <Polaris.DataTable
+              columnContentTypes={["text", "text", "text"]}
+              headings={["Product", "Labels", "Actions"]}
+              rows={rows}
+              footerContent={
+                rows.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '16px' }}>
+                    <Polaris.Text color="subdued">
+                      No products found
+                    </Polaris.Text>
+                  </div>
+                ) : null
+              }
             />
-          </Card>
-        </Layout.Section>
-      </Layout>
-    </Page>
+          </Polaris.Card>
+        </Polaris.Layout.Section>
+      </Polaris.Layout>
+
+      <Polaris.Modal
+        open={isModalOpen}
+        onClose={handleModalClose}
+        title={`Manage labels for ${selectedProduct?.title}`}
+        primaryAction={{
+          content: "Save",
+          onAction: () => handleLabelUpdate(selectedLabels),
+        }}
+        secondaryActions={[{
+          content: "Cancel",
+          onAction: handleModalClose,
+        }]}
+      >
+        <Polaris.Modal.Section>
+          <Polaris.ChoiceList
+            allowMultiple
+            title="Select labels"
+            choices={labels.map(label => ({
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      backgroundColor: label.color,
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '4px',
+                    }}
+                  />
+                  {label.name}
+                </div>
+              ),
+              value: label.id,
+            }))}
+            selected={selectedLabels}
+            onChange={setSelectedLabels}
+            name="labels"
+          />
+        </Polaris.Modal.Section>
+      </Polaris.Modal>
+    </Polaris.Page>
   );
 }

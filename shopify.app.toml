@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "89837ad5f359e5dc2198227f863f9fc2"
-application_url = "https://telecommunications-edited-export-dylan.trycloudflare.com"
+application_url = "https://reports-late-heater-modifications.trycloudflare.com"
 embedded = true
 name = "Product Label Generator"
 handle = "product-label-generator-3"
@@ -23,9 +23,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://telecommunications-edited-export-dylan.trycloudflare.com/auth/callback",
-  "https://telecommunications-edited-export-dylan.trycloudflare.com/auth/shopify/callback",
-  "https://telecommunications-edited-export-dylan.trycloudflare.com/api/auth/callback"
+  "https://reports-late-heater-modifications.trycloudflare.com/auth/callback",
+  "https://reports-late-heater-modifications.trycloudflare.com/auth/shopify/callback",
+  "https://reports-late-heater-modifications.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

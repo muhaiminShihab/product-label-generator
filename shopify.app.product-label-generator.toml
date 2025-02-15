@@ -1,0 +1,29 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "8cb1abc99ab0e45fa061bb75a91d2f35"
+application_url = "https://rocks-slim-daniel-urgent.trycloudflare.com"
+embedded = true
+name = "product-label-generator"
+handle = "product-label-generator-1"
+
+[build]
+dev_store_url = "quickstart-e17ebecc.myshopify.com"
+include_config_on_deploy = true
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2025-01"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
+[auth]
+redirect_urls = [
+  "https://rocks-slim-daniel-urgent.trycloudflare.com/auth/callback",
+  "https://rocks-slim-daniel-urgent.trycloudflare.com/auth/shopify/callback",
+  "https://rocks-slim-daniel-urgent.trycloudflare.com/api/auth/callback"
+]
+
+[pos]
+embedded = false

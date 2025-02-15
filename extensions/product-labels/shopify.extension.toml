@@ -1,0 +1,16 @@
+name = "product-labels"
+type = "theme"
+extension_points = ["Checkout::Dynamic::Render"]
+
+[[metafields]]
+namespace = "custom"
+key = "product_labels"
+type = "json"
+
+[capabilities]
+api_access = true
+block_progress = true
+
+[settings]
+fields = []
+

@@ -1,0 +1,47 @@
+{% assign product_labels = product.metafields.custom.product_labels | default: '[]' | json_parse %}
+
+<div class="app-block-container">
+  {% if product_labels.size > 0 %}
+    <div class="product-labels-wrapper">
+      {% for label in product_labels %}
+        {% if label.name != blank and label.color != blank %}
+          <span class="product-label">{{ label.name }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+{% schema %}
+{
+  "name": "Product Labels",
+  "target": "section",
+  "javascript": "product-labels.js",
+  "stylesheet": "product-labels.css",
+  "templates": ["product"],
+  "settings": [
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Label Position",
+      "options": [
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "bottom",
+          "label": "Bottom"
+        }
+      ],
+      "default": "top"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product Labels",
+      "category": "Product"
+    }
+  ]
+}
+{% endschema %}
