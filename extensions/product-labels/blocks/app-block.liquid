@@ -1,14 +1,29 @@
 {% assign product_labels = product.metafields.custom.product_labels | default: '[]' | json_parse %}
 
-<div class="app-block-container">
+<div class="app-block-container" {{ block.shopify_attributes }}>
   {% if product_labels.size > 0 %}
-    <div class="product-labels-wrapper">
+    <div class="product-labels-wrapper" style="margin: {{ block.settings.margin_top }}px 0 {{ block.settings.margin_bottom }}px 0;">
       {% for label in product_labels %}
         {% if label.name != blank and label.color != blank %}
-          <span class="product-label">{{ label.name }}</span>
+          <span
+            class="product-label"
+            style="
+              background-color: {{ label.color }};
+              color: {{ block.settings.text_color }};
+              font-size: {{ block.settings.font_size }}px;
+              padding: {{ block.settings.padding }}px;
+              border-radius: {{ block.settings.border_radius }}px;
+            "
+          >
+            {{ label.name }}
+          </span>
         {% endif %}
       {% endfor %}
     </div>
+  {% else %}
+    {% if request.design_mode %}
+      <div>No labels assigned to this product.</div>
+    {% endif %}
   {% endif %}
 </div>
 
@@ -16,31 +31,79 @@
 {
   "name": "Product Labels",
   "target": "section",
-  "javascript": "product-labels.js",
   "stylesheet": "product-labels.css",
-  "templates": ["product"],
   "settings": [
     {
       "type": "select",
       "id": "position",
-      "label": "Label Position",
+      "label": "Position",
       "options": [
         {
-          "value": "top",
-          "label": "Top"
+          "value": "before",
+          "label": "Before product description"
         },
         {
-          "value": "bottom",
-          "label": "Bottom"
+          "value": "after",
+          "label": "After product description"
         }
       ],
-      "default": "top"
-    }
-  ],
-  "presets": [
+      "default": "before"
+    },
     {
-      "name": "Product Labels",
-      "category": "Product"
+      "type": "range",
+      "id": "margin_top",
+      "min": 0,
+      "max": 50,
+      "step": 5,
+      "unit": "px",
+      "label": "Top Margin",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "min": 0,
+      "max": 50,
+      "step": 5,
+      "unit": "px",
+      "label": "Bottom Margin",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "min": 12,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "label": "Font Size",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "padding",
+      "min": 4,
+      "max": 20,
+      "step": 2,
+      "unit": "px",
+      "label": "Padding",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "min": 0,
+      "max": 20,
+      "step": 2,
+      "unit": "px",
+      "label": "Border Radius",
+      "default": 4
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text Color",
+      "default": "#ffffff"
     }
   ]
 }

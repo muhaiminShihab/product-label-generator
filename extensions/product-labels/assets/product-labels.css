@@ -1,11 +1,18 @@
 .app-block-container {
-  margin: 1rem 0;
+  width: 100%;
 }
 
 .product-labels-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  width: 100%;
+}
+
+.product-label {
+  display: inline-block;
+  line-height: 1.2;
+  font-weight: 500;
 }
 
 .product-label {
