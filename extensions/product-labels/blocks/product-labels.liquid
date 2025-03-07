@@ -1,0 +1,28 @@
+{% assign labels = product.metafields.custom.labels %}
+{% if labels != blank %}
+  <div class="product-labels" style="display: flex; gap: 8px; flex-wrap: wrap;">
+    {% assign label_data = labels.value | parse_json %}
+    {% for label in label_data %}
+      <span class="label" style="background-color: {{ label.color }}; padding: 4px 8px; border-radius: 4px; color: #fff;">
+        {{ label.name }}
+      </span>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<h1>Hello</h1>
+
+{% schema %}
+{
+  "name": "Product Labels",
+  "target": "section",
+  "settings": [
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    }
+  ]
+}
+{% endschema %}

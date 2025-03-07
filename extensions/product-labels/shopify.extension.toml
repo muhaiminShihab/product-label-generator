@@ -1,0 +1,4 @@
+# Shopify Extension Configuration File
+
+name = "Product Labels"
+type = "theme"

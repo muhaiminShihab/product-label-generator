@@ -41,12 +41,13 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const action = formData.get("action");
 
+  // Handle label creation
   if (action === "create") {
     const name = formData.get("name");
     const color = formData.get("color");
     const description = formData.get("description");
 
-    await prisma.label.create({
+    const newLabel = await prisma.label.create({
       data: {
         name,
         color,
@@ -54,20 +55,52 @@ export const action = async ({ request }) => {
         shop: session.shop,
       },
     });
-  } else if (action === "edit") {
+
+    // Sync to Shopify after label creation
+    await fetch(`${request.headers.get("origin")}/api/sync-labels`, {
+      method: "POST",
+      body: JSON.stringify({
+        shop: session.shop,
+        productId: newLabel.id, // You may need to replace this with the actual productId if required
+      }),
+    });
+  }
+  // Handle label edit
+  else if (action === "edit") {
     const id = formData.get("id");
     const name = formData.get("name");
     const color = formData.get("color");
     const description = formData.get("description");
 
-    await prisma.label.update({
+    const updatedLabel = await prisma.label.update({
       where: { id },
       data: { name, color, description },
     });
-  } else if (action === "delete") {
+
+    // Sync to Shopify after label update
+    await fetch(`${request.headers.get("origin")}/api/sync-labels`, {
+      method: "POST",
+      body: JSON.stringify({
+        shop: session.shop,
+        productId: updatedLabel.id, // Again, replace with actual productId if needed
+      }),
+    });
+  }
+  // Handle label deletion
+  else if (action === "delete") {
     const id = formData.get("id");
+
     await prisma.label.delete({
       where: { id },
+    });
+
+    // Sync to Shopify after label deletion
+    await fetch(`${request.headers.get("origin")}/api/sync-labels`, {
+      method: "POST",
+      body: JSON.stringify({
+        shop: session.shop,
+        productId: id, // Here, use the correct productId that should be synced
+      }),
     });
   }
 
